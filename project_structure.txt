@@ -2,12 +2,18 @@ CleanUninstaller/
 ├── LICENSE
 ├── README.md
 ├── requirements.txt
+│
 ├── src/
 │   ├── main.py
 │   ├── gui.py
 │   ├── uninstaller.py
 │   ├── registry_cleaner.py
-│   └── file_cleaner.py
+│   ├── file_cleaner.py
+│   └── tabs/
+│       ├── custom_uninstall_tab.py
+│       ├── installed_programs_tab.py
+│       └── running_programs_tab.py
+│
 ├── tests/
 │   ├── test_uninstaller.py
 │   ├── test_registry_cleaner.py
