@@ -1,0 +1,14 @@
+CleanUninstaller/
+├── LICENSE
+├── README.md
+├── requirements.txt
+├── src/
+│   ├── main.py
+│   ├── gui.py
+│   ├── uninstaller.py
+│   ├── registry_cleaner.py
+│   └── file_cleaner.py
+├── tests/
+│   ├── test_uninstaller.py
+│   ├── test_registry_cleaner.py
+│   └── test_file_cleaner.py
