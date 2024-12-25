@@ -1,5 +1,5 @@
 import logging
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QHBoxLayout, QLineEdit, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog, QMessageBox
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 import subprocess
 import json
@@ -15,26 +15,6 @@ class InstalledProgramsTab(QWidget):
         super().__init__()
         layout = QVBoxLayout()
 
-        # Filtros
-        filter_layout = QHBoxLayout()
-        self.filter_name = QLineEdit()
-        self.filter_name.setPlaceholderText("Filtrar por nome")
-        self.filter_name.textChanged.connect(self.apply_filters)
-
-        self.filter_date = QLineEdit()
-        self.filter_date.setPlaceholderText("Filtrar por data (AAAA-MM-DD)")
-        self.filter_date.textChanged.connect(self.apply_filters)
-
-        self.filter_size = QLineEdit()
-        self.filter_size.setPlaceholderText("Filtrar por tamanho (MB)")
-        self.filter_size.textChanged.connect(self.apply_filters)
-
-        filter_layout.addWidget(self.filter_name)
-        filter_layout.addWidget(self.filter_date)
-        filter_layout.addWidget(self.filter_size)
-
-        layout.addLayout(filter_layout)
-
         self.label = QLabel("Lista de Programas Instalados")
         self.label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.label)
@@ -43,6 +23,17 @@ class InstalledProgramsTab(QWidget):
         self.table_widget = QTableWidget()
         self.table_widget.setColumnCount(3)  # 3 colunas: Nome, Data, Tamanho
         self.table_widget.setHorizontalHeaderLabels(["Nome", "Data", "Tamanho (MB)"])
+
+        # Ajuste automático das colunas com largura mínima e ajustável
+        header = self.table_widget.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)  # Nome: ocupa o espaço restante
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Data: ajusta conforme o conteúdo
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Tamanho: ajusta conforme o conteúdo
+
+        # Ajuste de espaçamento entre as células
+        self.table_widget.setStyleSheet("QTableWidget {border: none; padding: 5px; font-size: 12pt;}")
+
+        # Conecta o clique nas colunas para ordenar
         self.table_widget.horizontalHeader().sectionClicked.connect(self.sort_table)
         layout.addWidget(self.table_widget)
 
@@ -92,10 +83,9 @@ class InstalledProgramsTab(QWidget):
         """Atualiza a tabela com os programas e dados adicionais."""
         try:
             self.programs = programs
-            filtered_programs = self.apply_filters()
-            self.table_widget.setRowCount(len(filtered_programs))
+            self.table_widget.setRowCount(len(programs))
 
-            for row, program in enumerate(filtered_programs):
+            for row, program in enumerate(programs):
                 name_item = QTableWidgetItem(program)
                 date_item = QTableWidgetItem(str(self.get_program_install_date(program)))
                 size_item = QTableWidgetItem(str(self.get_program_size(program) / (1024 * 1024)))  # Convertendo para MB
@@ -126,42 +116,6 @@ class InstalledProgramsTab(QWidget):
         except Exception as e:
             logging.error(f"Erro ao tentar ordenar a tabela: {e}")
             QMessageBox.critical(self, "Erro", f"Ocorreu um erro ao tentar ordenar a tabela de programas: {e}")
-
-    def apply_filters(self):
-        """Aplica os filtros de nome, data e tamanho aos programas."""
-        try:
-            filtered_programs = self.programs
-
-            # Filtro por nome
-            name_filter = self.filter_name.text().lower()
-            if name_filter:
-                filtered_programs = [program for program in filtered_programs if name_filter in program.lower()]
-
-            # Filtro por data (YYYY-MM-DD)
-            date_filter = self.filter_date.text()
-            if date_filter:
-                try:
-                    date_filter = datetime.strptime(date_filter, "%Y-%m-%d")
-                    filtered_programs = [program for program in filtered_programs if self.get_program_install_date(program) == date_filter]
-                except ValueError:
-                    QMessageBox.warning(self, "Erro", "Formato de data inválido. Use AAAA-MM-DD.")
-                    return []
-
-            # Filtro por tamanho (MB)
-            size_filter = self.filter_size.text()
-            if size_filter:
-                try:
-                    size_filter = float(size_filter) * 1024 * 1024  # Convertendo para bytes
-                    filtered_programs = [program for program in filtered_programs if self.get_program_size(program) >= size_filter]
-                except ValueError:
-                    QMessageBox.warning(self, "Erro", "Digite um valor numérico para o tamanho.")
-                    return []
-
-            return filtered_programs
-
-        except Exception as e:
-            logging.error(f"Erro ao aplicar os filtros: {e}")
-            return []
 
     def get_program_install_date(self, program_name):
         """Obtém a data de instalação de um programa (baseada no arquivo principal)."""
@@ -268,13 +222,13 @@ class InstalledProgramsThread(QThread):
                 self.finished_list.emit(programs)
             else:
                 self.finished_list.emit([])
-
         except Exception as e:
             logging.error(f"Erro ao obter programas instalados: {e}")
             self.finished_list.emit([])
 
+
 class UninstallProgramThread(QThread):
-    """Thread para desinstalar um programa."""
+    """Thread para desinstalar programas."""
     uninstall_status = pyqtSignal(bool, str)
 
     def __init__(self, program_name):
@@ -284,15 +238,12 @@ class UninstallProgramThread(QThread):
     def run(self):
         """Desinstala o programa usando WMIC."""
         try:
-            result = subprocess.run(
-                ["wmic", "product", "where", f"name='{self.program_name}'", "call", "uninstall"],
-                capture_output=True, text=True, shell=True
-            )
-            if "ReturnValue = 0" in result.stdout:
+            command = f"wmic product where name='{self.program_name}' call uninstall"
+            result = subprocess.run(command, capture_output=True, text=True, shell=True)
+            if "ReturnValue = 0;" in result.stdout:
                 self.uninstall_status.emit(True, self.program_name)
             else:
                 self.uninstall_status.emit(False, self.program_name)
-
         except Exception as e:
-            logging.error(f"Erro ao desinstalar o programa '{self.program_name}': {e}")
+            logging.error(f"Erro ao desinstalar '{self.program_name}': {e}")
             self.uninstall_status.emit(False, self.program_name)
